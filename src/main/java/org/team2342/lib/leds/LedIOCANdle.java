@@ -28,30 +28,43 @@ import edu.wpi.first.wpilibj.util.Color;
 import org.team2342.frc.util.PhoenixUtils;
 
 /**
- * CANdle LED controller implementation supporting up to 8 independent sections.
- * Each section can run a different animation on its own slot (0-7).
+ * CTRE CANdle hardware implementation of LED control.
  *
- * <p>Based on CTRE Phoenix 6 CANdle best practices:
- * - Uses separate animation slots for concurrent animations
- * - Only updates when state changes to avoid flashing
- * - Properly clears animations before changing modes
+ * <p>Supports up to 8 independent LED sections, each running its own animation in a separate
+ * slot (0-7). This allows different parts of the LED strip to display different effects
+ * simultaneously.
+ *
+ * <p><b>Implementation Details:</b>
+ * <ul>
+ *   <li>Uses Phoenix 6 CANdle animation slots for concurrent animations
+ *   <li>Tracks previous state to avoid unnecessary CAN bus updates
+ *   <li>Properly clears animations before changing modes to prevent flickering
+ *   <li>Auto-divides LED strip equally among 8 sections
+ * </ul>
+ *
+ * <p><b>Hardware Configuration:</b>
+ * <ul>
+ *   <li>Strip type: GRB (configurable in constructor)
+ *   <li>Default brightness: 70% (configurable)
+ *   <li>5V rail enabled for powering external LED strips
+ * </ul>
  */
 public class LedIOCANdle implements LedIO {
   private final CANdle candle;
   private final LedSection[] sections;
   private final int totalLedCount;
 
-  // Track previous state to avoid unnecessary updates
+  // Track previous state to prevent unnecessary CAN bus traffic
   private final Animation[] previousAnimations;
   private final Color[] previousPrimaryColors;
   private final Color[] previousSecondaryColors;
 
   /**
-   * Creates a new CANdle LED controller
+   * Creates a new CANdle LED controller with specified parameters.
    *
-   * @param canId CAN ID of the CANdle device
-   * @param totalLedCount Total number of LEDs in the strip
-   * @param canBusName CAN bus name (typically "rio" or "canivore")
+   * @param canId CAN ID of the CANdle device (typically 20-30)
+   * @param totalLedCount Total number of addressable LEDs in the strip
+   * @param canBusName CAN bus name ("rio" for RoboRIO, or CANivore name)
    */
   public LedIOCANdle(int canId, int totalLedCount, String canBusName) {
     this.candle = new CANdle(canId, new CANBus(canBusName));
@@ -90,7 +103,10 @@ public class LedIOCANdle implements LedIO {
   }
 
   /**
-   * Convenience constructor using default "rio" CAN bus
+   * Creates a new CANdle LED controller on the default RoboRIO CAN bus.
+   *
+   * @param canId CAN ID of the CANdle device
+   * @param totalLedCount Total number of addressable LEDs in the strip
    */
   public LedIOCANdle(int canId, int totalLedCount) {
     this(canId, totalLedCount, "rio");
@@ -98,7 +114,7 @@ public class LedIOCANdle implements LedIO {
 
   @Override
   public void updateInputs(LedIOInputs inputs) {
-    // Copy current section states to inputs for logging
+    // Copy current section states to inputs for AdvantageKit logging
     for (int i = 0; i < 8; i++) {
       inputs.sections[i] = sections[i];
     }
@@ -116,6 +132,7 @@ public class LedIOCANdle implements LedIO {
       return;
     }
 
+    // Ensure colors are never null
     if (color == null) color = Color.kBlack;
     if (secondColor == null) secondColor = Color.kBlack;
 
@@ -123,13 +140,14 @@ public class LedIOCANdle implements LedIO {
     sections[section].primaryColor = color;
     sections[section].secondaryColor = secondColor;
 
-    // Only update if state changed
+    // Only send CAN commands if state has changed (prevents flickering and reduces CAN bus usage)
     if (animation != previousAnimations[section] ||
         !color.equals(previousPrimaryColors[section]) ||
         !secondColor.equals(previousSecondaryColors[section])) {
 
       applySection(section);
 
+      // Update tracking state
       previousAnimations[section] = animation;
       previousPrimaryColors[section] = color;
       previousSecondaryColors[section] = secondColor;
@@ -161,8 +179,12 @@ public class LedIOCANdle implements LedIO {
   }
 
   /**
-   * Apply animation to a specific section.
-   * Uses the section number as the animation slot (0-7).
+   * Applies the configured animation to a specific section.
+   *
+   * <p>Each section uses its own animation slot (0-7) allowing multiple concurrent animations.
+   * Properly clears any existing animation before applying a new one to prevent flickering.
+   *
+   * @param sectionIndex Section number (0-7) to apply the animation to
    */
   private void applySection(int sectionIndex) {
     LedSection section = sections[sectionIndex];
@@ -273,7 +295,10 @@ public class LedIOCANdle implements LedIO {
   }
 
   /**
-   * Set animation speed for a section (0.0 to 1.0, default 1.0)
+   * Sets the animation speed for a specific section.
+   *
+   * @param section Section number (0-7)
+   * @param speed Animation speed (0.0-1.0, where 1.0 is normal speed)
    */
   public void setSectionSpeed(int section, double speed) {
     if (section >= 0 && section < 8) {
@@ -283,7 +308,10 @@ public class LedIOCANdle implements LedIO {
   }
 
   /**
-   * Set animation brightness for a section (0.0 to 1.0, default 1.0)
+   * Sets the LED brightness for a specific section.
+   *
+   * @param section Section number (0-7)
+   * @param brightness LED brightness (0.0-1.0, where 1.0 is full brightness)
    */
   public void setSectionBrightness(int section, double brightness) {
     if (section >= 0 && section < 8) {
@@ -293,10 +321,10 @@ public class LedIOCANdle implements LedIO {
   }
 
   /**
-   * Get the LED range for a specific section
+   * Gets the LED index range for a specific section.
    *
    * @param section Section number (0-7)
-   * @return Array with [startIndex, endIndex]
+   * @return Array with [startIndex, endIndex], or [0, 0] if invalid section
    */
   public int[] getSectionRange(int section) {
     if (section >= 0 && section < 8) {

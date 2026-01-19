@@ -8,12 +8,22 @@ package org.team2342.lib.leds;
 
 import edu.wpi.first.wpilibj.util.Color;
 
+/**
+ * Hardware abstraction interface for LED controllers.
+ *
+ * <p>Supports up to 8 independent LED sections, each with its own animation and colors.
+ * Implementations include hardware (CANdle) and simulation.
+ */
 public interface LedIO {
+  /** Container for logged LED state data */
   public static class LedIOInputs {
     public LedSection[] sections = new LedSection[8];
   }
 
-  /** Update loggable inputs */
+  /**
+   * Update logged inputs with current LED state.
+   * Called periodically by the subsystem for AdvantageKit logging.
+   */
   public default void updateInputs(LedIOInputs inputs) {}
 
   /**
@@ -43,17 +53,30 @@ public interface LedIO {
    */
   public default void setAll(Animation animation, Color color) {}
 
-  /** Clear all animations and turn off all LEDs */
+  /**
+   * Clear all animations and turn off all LEDs.
+   * Sets all sections to OFF with black color.
+   */
   public default void clearAll() {}
 
-  /** Data class representing a single LED section */
+  /**
+   * Configuration for a single LED section.
+   * Each section can have independent animation, colors, speed, and brightness.
+   */
   public static class LedSection {
+    /** Starting LED index in the strip (inclusive) */
     public int startIndex;
+    /** Ending LED index in the strip (exclusive) */
     public int endIndex;
+    /** Current animation running on this section */
     public Animation animation;
+    /** Primary color (used by all animations) */
     public Color primaryColor;
+    /** Secondary color (used by some animations like COLOR_FLOW) */
     public Color secondaryColor;
+    /** Animation speed (0.0-1.0, where 1.0 is normal speed) */
     public double speed;
+    /** LED brightness (0.0-1.0, where 1.0 is full brightness) */
     public double brightness;
 
     public LedSection() {
@@ -65,39 +88,42 @@ public interface LedIO {
     }
   }
 
-  /** All available CANdle animation types */
+  /**
+   * Available LED animation types.
+   * All animations are hardware-accelerated on the CANdle device.
+   */
   public enum Animation {
-    /** No animation - LEDs off */
+    /** No animation - all LEDs off (black) */
     OFF,
 
-    /** Solid color - no animation */
+    /** Static solid color with no animation */
     SOLID,
 
-    /** Color flow animation - colors flow along the strip */
+    /** Flowing color pattern that moves along the strip */
     COLOR_FLOW,
 
-    /** Fire animation - flickering fire effect */
+    /** Flickering fire effect with random intensity variation */
     FIRE,
 
-    /** Larson scanner animation - KITT/Cylon effect */
+    /** "KITT" or "Cylon" scanner effect that bounces back and forth */
     LARSON,
 
-    /** Rainbow animation - rotating rainbow */
+    /** Full spectrum rainbow that rotates through the strip */
     RAINBOW,
 
-    /** RGB fade animation - fade through RGB colors */
+    /** Smooth fade through red, green, and blue colors */
     RGB_FADE,
 
-    /** Single fade animation - fade in/out of a single color */
+    /** Fade in and out of a single specified color */
     SINGLE_FADE,
 
-    /** Strobe animation - rapid flashing */
+    /** Rapid on/off flashing at high speed */
     STROBE,
 
-    /** Twinkle animation - random twinkling LEDs */
+    /** Random LEDs twinkle on at varying brightness levels */
     TWINKLE,
 
-    /** Twinkle off animation - random dimming LEDs */
+    /** Random LEDs dim/turn off (inverse of TWINKLE) */
     TWINKLE_OFF
   }
 }

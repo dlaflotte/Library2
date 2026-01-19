@@ -12,33 +12,46 @@ import org.team2342.lib.leds.LedIO.Animation;
 import org.team2342.lib.leds.LedIO.LedIOInputs;
 
 /**
- * LED strip subsystem that manages up to 8 independent sections.
- * Each section can display a different animation simultaneously.
+ * LED strip subsystem providing high-level control over LED animations.
  *
- * <p>Example usage:
+ * <p>Manages up to 8 independent LED sections, each capable of running different animations
+ * simultaneously. Integrates with AdvantageKit for logging and uses the IO layer pattern
+ * for hardware abstraction.
+ *
+ * <p><b>Basic Usage:</b>
  * <pre>
- * // Set section 0 to solid red
- * ledStrip.setSection(0, Animation.SOLID, Color.kRed);
+ * // Create subsystem (typically in RobotContainer)
+ * LedStrip leds = new LedStrip(new LedIOCANdle(22, 300), "LEDs");
  *
- * // Set section 1 to rainbow
- * ledStrip.setSection(1, Animation.RAINBOW, Color.kBlack);
+ * // Set individual sections
+ * leds.setSection(0, Animation.SOLID, Color.kRed);
+ * leds.setSection(1, Animation.RAINBOW, Color.kBlack);
+ * leds.setSection(2, Animation.STROBE, Color.kBlue);
  *
- * // Set section 2 to blue strobe
- * ledStrip.setSection(2, Animation.STROBE, Color.kBlue);
+ * // Set all sections at once
+ * leds.setAll(Animation.SOLID, Color.kGreen);
  *
- * // Set all sections to solid green
- * ledStrip.setAll(Animation.SOLID, Color.kGreen);
+ * // Use convenience methods
+ * leds.setAlternating(Animation.SOLID, Color.kRed, Color.kBlue);
  * </pre>
+ *
+ * <p><b>Advanced Features:</b>
+ * <ul>
+ *   <li>Control speed and brightness per section
+ *   <li>Create alternating color patterns
+ *   <li>Implement chase/scanner effects
+ *   <li>Full AdvantageKit logging integration
+ * </ul>
  */
 public class LedStrip extends SubsystemBase {
   private final LedIO io;
   private final LedIOInputs inputs = new LedIOInputs();
 
   /**
-   * Create a new LED strip subsystem
+   * Creates a new LED strip subsystem.
    *
-   * @param io The LED IO implementation (typically LedIOCANdle)
-   * @param name Subsystem name for logging
+   * @param io The LED IO implementation (LedIOCANdle for hardware, LedIOSim for simulation)
+   * @param name Subsystem name used for AdvantageKit logging
    */
   public LedStrip(LedIO io, String name) {
     this.io = io;
@@ -89,18 +102,16 @@ public class LedStrip extends SubsystemBase {
     io.setAll(animation, color);
   }
 
-  /**
-   * Turn off all LEDs and clear all animations
-   */
+  /** Turns off all LEDs and clears all animations across all sections. */
   public void clearAll() {
     io.clearAll();
   }
 
   /**
-   * Set animation speed for a specific section
+   * Sets the animation speed for a specific section (hardware only).
    *
    * @param section Section number (0-7)
-   * @param speed Speed value (0.0 to 1.0, where 1.0 is fastest)
+   * @param speed Speed multiplier (0.0-1.0, where 1.0 is normal speed)
    */
   public void setSectionSpeed(int section, double speed) {
     if (io instanceof LedIOCANdle) {
@@ -109,10 +120,10 @@ public class LedStrip extends SubsystemBase {
   }
 
   /**
-   * Set animation brightness for a specific section
+   * Sets the LED brightness for a specific section (hardware only).
    *
    * @param section Section number (0-7)
-   * @param brightness Brightness value (0.0 to 1.0, where 1.0 is brightest)
+   * @param brightness Brightness level (0.0-1.0, where 1.0 is full brightness)
    */
   public void setSectionBrightness(int section, double brightness) {
     if (io instanceof LedIOCANdle) {
@@ -121,10 +132,10 @@ public class LedStrip extends SubsystemBase {
   }
 
   /**
-   * Get the LED index range for a section
+   * Gets the LED index range for a specific section.
    *
    * @param section Section number (0-7)
-   * @return Array with [startIndex, endIndex]
+   * @return Array with [startIndex, endIndex], or [0, 0] if not supported
    */
   public int[] getSectionRange(int section) {
     if (io instanceof LedIOCANdle) {
@@ -133,15 +144,15 @@ public class LedStrip extends SubsystemBase {
     return new int[] {0, 0};
   }
 
-  // Convenience methods for common patterns
+  // ==================== Convenience Methods ====================
 
   /**
-   * Set multiple sections to the same animation
+   * Sets a range of consecutive sections to the same animation and color.
    *
-   * @param startSection First section (inclusive)
-   * @param endSection Last section (inclusive)
+   * @param startSection First section (inclusive, 0-7)
+   * @param endSection Last section (inclusive, 0-7)
    * @param animation Animation type
-   * @param color Color for the animation
+   * @param color Color for all sections in range
    */
   public void setSections(int startSection, int endSection, Animation animation, Color color) {
     for (int i = startSection; i <= endSection && i < 8; i++) {
@@ -150,12 +161,14 @@ public class LedStrip extends SubsystemBase {
   }
 
   /**
-   * Set alternating sections to two different colors
-   * Useful for team color patterns
+   * Sets alternating sections to two different colors.
    *
-   * @param animation Animation type for all sections
-   * @param color1 First color
-   * @param color2 Second color
+   * <p>Creates an even/odd pattern useful for team colors or visual indicators.
+   * Even sections (0, 2, 4, 6) use color1, odd sections (1, 3, 5, 7) use color2.
+   *
+   * @param animation Animation type applied to all sections
+   * @param color1 Color for even-numbered sections
+   * @param color2 Color for odd-numbered sections
    */
   public void setAlternating(Animation animation, Color color1, Color color2) {
     for (int i = 0; i < 8; i++) {
@@ -164,12 +177,21 @@ public class LedStrip extends SubsystemBase {
   }
 
   /**
-   * Create a "chase" effect by setting sections in sequence
-   * Call this repeatedly with incrementing step values
+   * Creates a sequential "chase" or "scanner" effect across sections.
    *
-   * @param animation Animation type
+   * <p>Lights up one section at a time in sequence. Call this method repeatedly
+   * with incrementing step values to create a moving light effect.
+   *
+   * <p>Example:
+   * <pre>
+   * int step = 0;
+   * // In periodic method:
+   * leds.setChase(Animation.SOLID, Color.kRed, step++);
+   * </pre>
+   *
+   * @param animation Animation type for the active section
    * @param color Color for the lit section
-   * @param step Current step (0-7)
+   * @param step Current step (wraps around at 8)
    */
   public void setChase(Animation animation, Color color, int step) {
     for (int i = 0; i < 8; i++) {
